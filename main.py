@@ -5,9 +5,9 @@ class APClient:
     """ Методы Вконтакте"""
 
     Api_base_url = 'https://api.vk.com/method'
-    def __init__(self, vk_token, user_id, ya_token):
+    def __init__(self, vk_token, ya_token):
         self.vk_token = vk_token
-        self.user_id = user_id
+        # self.user_id = user_id
         self.ya_token = ya_token
 
     def get_common_params(self):
@@ -15,6 +15,12 @@ class APClient:
             'access_token': self.vk_token,
             'v': '5.131'
         }
+
+    def get_userID(self):
+        params = self.get_common_params()
+        response = requests.get(f"{self.Api_base_url}/users.get", params=params).json()
+        user_id = response.get('response')[0].get('id')
+        return user_id
 
     def get_albums(self):
         params = self.get_common_params()
@@ -29,7 +35,7 @@ class APClient:
 
     def get_profile_photos(self, folder_id):
         params = self.get_common_params()
-        params.update({'owner_id': self.user_id, 'album_id': folder_id, 'photo_sizes': 1, 'extended': 1})
+        params.update({'owner_id': self.get_userID(), 'album_id': folder_id, 'photo_sizes': 1, 'extended': 1})
         response = requests.get(
             f"{self.Api_base_url}/photos.get", params=params)
 
@@ -166,35 +172,48 @@ if __name__ == '__main__':
     from time import sleep
     import os
     import json
+    import configparser
+
 
     App_ID = '51750980'
-    user_id = 822203161  # мой ВК номер
+    # user_id = 822203161  # мой ВК номер
 
-    vk_token = 'vk1.a.LxMdqXQKSf4wLHVIYjtM71wyRJK9LUbxVQpcJHNQAX9MV85rQpYxxvcpKKTtXvKlp73p4eyGoxzrp_MHHjCAeCPC1HITGn7gxypxQBDJicfnQPCRX5Y1xmR5N-dSMR7MsQZSz89CMZN5b2mqFBFvDZ9SFpQ88FE0iIbfMRJq1ZzREr86SwyAxSswnzA5w48HjBlXsOTaW2zjfLEak58APg'
-    ya_token = 'y0_AgAAAABw6dhzAADLWwAAAADtGY1OPwhO7uLBTzCtL-I48NOLyPlvI0M'
-    ya_folder = 'VK ver5'
-    folder_id = 297310255 # папка qwert
-    number_of_photos = 5
+    # vk_token = 'vk1.a.LxMdqXQKSf4wLHVIYjtM71wyRJK9LUbxVQpcJHNQAX9MV85rQpYxxvcpKKTtXvKlp73p4eyGoxzrp_MHHjCAeCPC1HITGn7gxypxQBDJicfnQPCRX5Y1xmR5N-dSMR7MsQZSz89CMZN5b2mqFBFvDZ9SFpQ88FE0iIbfMRJq1ZzREr86SwyAxSswnzA5w48HjBlXsOTaW2zjfLEak58APg'
+    # ya_token = 'y0_AgAAAABw6dhzAADLWwAAAADtGY1OPwhO7uLBTzCtL-I48NOLyPlvI0M'
+    # ya_folder = 'VK ver5'
+    # folder_id = 297310255 # папка qwert
+    # number_of_photos = 5
 
-    # user_id = int(input('INPUT USER ID VK'))
-    # vk_token = input('INPUT VK TOKEN')
-    # ya_token = input('INPUT YANDEX TOKEN')
 
-    vk_client = APClient(vk_token, user_id, ya_token)
+    vk_token = input('INPUT VK TOKEN')
+    ya_token = input('INPUT YANDEX TOKEN')
+    config = configparser.ConfigParser()
+    config.add_section('Settings')
+    config.set('Settings', 'vk_token', vk_token)
+    config.set('Settings', 'ya_token', ya_token)
+    with open('config.ini', 'w') as file:
+        config.write(file)
+    config.read('config.ini')
+    ya_token = config.get('Settings', 'ya_token')
+    vk_token = config.get('Settings', 'vk_token')
 
-    # vk_folder = input('INPUT FOLDER NAME IN VK PROFILE')
-    # folder_dict = vk_client.get_albums()
-    # while vk_folder not in folder_dict:
-    #     print('FOLDER NOT IN VK PROFILE')
-    #     vk_folder = input('INPUT FOLDER NAME')
-    # else:
-    #     folder_id = folder_dict[vk_folder]
-# number_of_photos = input('HOW MANY PHOTOS TO COPY?: ')
+
+
+    vk_client = APClient(vk_token, ya_token)
+
+    vk_folder = input('INPUT FOLDER NAME IN VK PROFILE')
+    folder_dict = vk_client.get_albums()
+    while vk_folder not in folder_dict:
+        print('FOLDER NOT IN VK PROFILE')
+        vk_folder = input('INPUT FOLDER NAME')
+    else:
+        folder_id = folder_dict[vk_folder]
+    number_of_photos = int(input('HOW MANY PHOTOS TO COPY?: '))
     count_photos = vk_client.get_profile_photos(folder_id).get('response', {}).get('count')
 
     if number_of_photos >= count_photos:
-        print(f'ONLY {count_photos} PHOTOS WILL BE COPIED')
-    # ya_folder = input('INPUT FOLDER NAME FOR YANDEX DISK: ')
+        print("\033[32m {}".format(f'ONLY {count_photos} PHOTOS WILL BE COPIED'))
+    ya_folder = input('INPUT FOLDER NAME FOR YANDEX DISK: ')
 
 
 
@@ -204,12 +223,15 @@ if __name__ == '__main__':
     # vk_client.ya_folder(ya_folder)
     # vk_client.ya_upload_link()
 
+    # print(vk_client.get_userID())
     # pprint(vk_client.get_albums())
     # pprint(vk_client.get_profile_photos(folder_id))
     # pprint(vk_client.list_of_photos_to_upload())
     # print(vk_client.Json_file())
     # vk_client.files_save_in_python()
     # vk_client.max_size_photo(0)..
+
+
 
 
 
