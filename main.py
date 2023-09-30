@@ -16,16 +16,28 @@ class APClient:
             'v': '5.131'
         }
 
-    def get_profile_photos(self):
+    def get_albums(self):
         params = self.get_common_params()
-        params.update({'owner_id': self.user_id, 'album_id': 'wall', 'photo_sizes': 1, 'extended': 1})
+        folder_dict = {}
+        response = requests.get(
+            f"{self.Api_base_url}/photos.getAlbums", params=params)
+        # print(response.json())
+        for items in response.json().get('response', {}).get('items'):
+            folder_dict.update({items['title']:items['id']})
+
+        return folder_dict
+
+    def get_profile_photos(self, folder_id):
+        params = self.get_common_params()
+        params.update({'owner_id': self.user_id, 'album_id': folder_id, 'photo_sizes': 1, 'extended': 1})
         response = requests.get(
             f"{self.Api_base_url}/photos.get", params=params)
+
         return response.json()
 
-    def max_size_photo(self, number): #number это порядковый номер фото в списке фоток
+    def max_size_photo(self, number, folder_id): #number это порядковый номер фото в списке фоток
         max_height = 0
-        user_photos = self.get_profile_photos()
+        user_photos = self.get_profile_photos(folder_id)
         photo_size_list = user_photos.get('response', {}).get('items')[number].get('sizes')  # список размеров одной фотки
         photo_date = user_photos.get('response', {}).get('items')[number].get('date')
         likes_count = user_photos.get('response', {}).get('items')[number].get('likes').get('count')
@@ -36,21 +48,21 @@ class APClient:
                 photo_type = photo['type']
         return max_size_url, photo_type, photo_date, likes_count
 
-    def list_of_photos_to_upload(self):
-        user_photos = self.get_profile_photos()
+    def list_of_photos_to_upload(self, folder_id):
+        user_photos = self.get_profile_photos(folder_id)
         photo_count = user_photos.get('response', {}).get('count')
-        lst =[]
+        lst = []
         for number in range(photo_count):
-            lst.append(self.max_size_photo(number))
+            lst.append(self.max_size_photo(number, folder_id))
         return lst
 
-    def unix_to_timestamp(self,value):
+    def unix_to_timestamp(self, value):
         from datetime import datetime
         value = datetime.fromtimestamp(value)
         return value.strftime('%Y_%m_%d %Hhr %Mmin')
 
-    def Json_file(self):
-        lst = self.list_of_photos_to_upload()
+    def Json_file(self, folder_id):
+        lst = self.list_of_photos_to_upload(folder_id)
         photos_list = []
         file_name_list = []
         photo_id_dict ={}
@@ -78,12 +90,13 @@ class APClient:
 
         return photos_list
 
-    def files_save_in_python(self):
-        lst = self.list_of_photos_to_upload()
+    def files_save_in_python(self, folder_id):
+        lst = self.list_of_photos_to_upload(folder_id)
         for item in tqdm(range(len(lst)), desc='VK files download'):
             photo_url = lst[item][0]
-            file_name = self.Json_file()[item].get('file_name')
+            file_name = self.Json_file(folder_id)[item].get('file_name')
             response = requests.get(photo_url)
+            sleep(0.3)
             with open(file_name, 'wb') as file:
                 file.write(response.content)
 
@@ -96,7 +109,7 @@ class APClient:
         return {'Authorization': f'OAuth {self.ya_token}'}
 
 
-    # def folder_check(self, folder): # проверяет наличие папки на яндекс диске
+    # def folder_check(self, ya_folder): # проверяет наличие папки на яндекс диске
     #     url = 'https://cloud-api.yandex.net/v1/disk/resources'
     #     headers = self.ya_common_headers()
     #     params = {
@@ -105,7 +118,7 @@ class APClient:
     #     }
     #     response = requests.get(url, params=params, headers=headers).json()
     #     for item in response.get('_embedded').get('items'):
-    #         if item['name'] == folder:
+    #         if item['name'] == ya_folder:
     #             return True
     #         else:
     #             return False
@@ -129,12 +142,12 @@ class APClient:
         upload_link = response.get('href')
         return upload_link
 
-    def ya_file_upload(self, folder):
+    def ya_file_upload(self, folder, id_vk_folder):
         print("\033[32m {}".format('WARMING UP...'))
-        # if self.folder_check(folder) is False:
+        # if self.folder_check(ya_folder) is False:
         self.ya_folder(folder)
-        self.files_save_in_python()
-        for item in tqdm(self.Json_file(), desc='YA files upload'):
+        self.files_save_in_python(id_vk_folder)
+        for item in tqdm(self.Json_file(folder_id), desc='YA files upload'):
             file_name = item['file_name']
             with open(file_name, 'rb') as file:
                 response = requests.put(self.ya_upload_link(folder, file_name), files={'file': file})
@@ -148,27 +161,51 @@ class APClient:
 
 if __name__ == '__main__':
     import requests
+    from pprint import pprint
     from tqdm import tqdm
+    from time import sleep
     import os
     import json
 
     App_ID = '51750980'
-    # user_id = 822203161  # мой ВК номер
-    user_id = int(input('INPUT USER ID VK'))
-    vk_token = input('INPUT VK TOKEN')
-    ya_token = input('INPUT YANDEX TOKEN')
-    folder = input('INPUT FOLDER NAME')
+    user_id = 822203161  # мой ВК номер
+
+    vk_token = 'vk1.a.LxMdqXQKSf4wLHVIYjtM71wyRJK9LUbxVQpcJHNQAX9MV85rQpYxxvcpKKTtXvKlp73p4eyGoxzrp_MHHjCAeCPC1HITGn7gxypxQBDJicfnQPCRX5Y1xmR5N-dSMR7MsQZSz89CMZN5b2mqFBFvDZ9SFpQ88FE0iIbfMRJq1ZzREr86SwyAxSswnzA5w48HjBlXsOTaW2zjfLEak58APg'
+    ya_token = 'y0_AgAAAABw6dhzAADLWwAAAADtGY1OPwhO7uLBTzCtL-I48NOLyPlvI0M'
+    ya_folder = 'VK ver5'
+    folder_id = 297310255 # папка qwert
+    number_of_photos = 5
+
+    # user_id = int(input('INPUT USER ID VK'))
+    # vk_token = input('INPUT VK TOKEN')
+    # ya_token = input('INPUT YANDEX TOKEN')
 
     vk_client = APClient(vk_token, user_id, ya_token)
 
-    vk_client.ya_file_upload(folder)  # активация программы с казанием имени папки на Yandex
-    # vk_client.ya_folder(folder)
+    # vk_folder = input('INPUT FOLDER NAME IN VK PROFILE')
+    # folder_dict = vk_client.get_albums()
+    # while vk_folder not in folder_dict:
+    #     print('FOLDER NOT IN VK PROFILE')
+    #     vk_folder = input('INPUT FOLDER NAME')
+    # else:
+    #     folder_id = folder_dict[vk_folder]
+# number_of_photos = input('HOW MANY PHOTOS TO COPY?: ')
+    count_photos = vk_client.get_profile_photos(folder_id).get('response', {}).get('count')
 
+    if number_of_photos >= count_photos:
+        print(f'ONLY {count_photos} PHOTOS WILL BE COPIED')
+    # ya_folder = input('INPUT FOLDER NAME FOR YANDEX DISK: ')
+
+
+
+
+
+    vk_client.ya_file_upload(ya_folder, folder_id)  # активация программы с казанием имени папки на Yandex и id папки вконтакте
+    # vk_client.ya_folder(ya_folder)
     # vk_client.ya_upload_link()
-    # pprint(vk_client.get_profile_photos())
-    # print(vk_client.get_status())
-    # print(vk_client.set_status('allhbn gud'))
-    # print(vk_client.get_status())
+
+    # pprint(vk_client.get_albums())
+    # pprint(vk_client.get_profile_photos(folder_id))
     # pprint(vk_client.list_of_photos_to_upload())
     # print(vk_client.Json_file())
     # vk_client.files_save_in_python()
